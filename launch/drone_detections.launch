@@ -1,5 +1,0 @@
-<launch>
-
-    <node pkg="drone_detections" name="drone_detections" type="drone_detections" output="screen" />
-
-</launch>

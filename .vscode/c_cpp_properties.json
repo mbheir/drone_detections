@@ -5,7 +5,10 @@
             "includePath": [
                 "${workspaceFolder}/**",
                 "/opt/ros/noetic/include/",
-                "include/**"
+                "/home/olewam/opencv_with_contrib/**",
+                "/home/olewam/opencv_with_contrib/opencv/**",
+                "detection/include/**",
+                "yolo/include/**"
             ],
             "defines": [],
             "compilerPath": "/usr/bin/clang",

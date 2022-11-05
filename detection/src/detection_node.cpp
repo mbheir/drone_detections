@@ -1,8 +1,8 @@
-#include "object_detection.hpp"
+#include "detection.hpp"
 
 int main(int argc, char **argv)
 {
-    ros::init(argc, argv, "object_detections");
+    ros::init(argc, argv, "detection");
     ros::NodeHandle nh;
     Detection detection(nh);
 

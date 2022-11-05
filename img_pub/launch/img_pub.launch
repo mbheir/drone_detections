@@ -1,0 +1,5 @@
+<launch>
+
+    <node pkg="img_pub" name="img_pub" type="img_pub" output="screen" />
+
+</launch>

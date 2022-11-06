@@ -8,6 +8,7 @@
                 "/home/olewam/opencv_with_contrib/**",
                 "/home/olewam/opencv_with_contrib/opencv/**",
                 "detection/include/**",
+                "/home/olewam/catkin_ws/src/darknet/include/**",
                 "yolo/include/**"
             ],
             "defines": [],

@@ -1,90 +1,134 @@
 #include "object_detection.hpp"
 
+
 ObjectDetection::ObjectDetection(ros::NodeHandle &nh)
   : nh_(nh)
 {
   camera_sub_ = nh_.subscribe("/yolo/image", 1, &ObjectDetection::ObjectDetectionCallback, this); // Double check topic
   bbox_pub_ = nh_.advertise<vision_msgs::Detection2DArray>("/yolo/detections", 1);
 
-  std::string config_path = "/home/olewam/catkin_ws/src/drone_detections/yolo/include/darpa_v3.cfg"; // Path to yolo config file 
-  std::string weights_path = "/home/olewam/catkin_ws/src/drone_detections/yolo/include/darpa_v3_16000.weights"; // Path to yolo weights file 
+  string config_path = "/home/olewam/detection_ws/src/drone_detections/yolo/include/darpa_v3.cfg"; // Path to yolo config file 
+  string weights_path = "/home/olewam/detection_ws/src/drone_detections/yolo/include/darpa_v3_16000.weights"; // Path to yolo weights file 
+  string names_path = "/home/olewam/detection_ws/src/drone_detections/yolo/include/darpa.names";
 
-  net_ = cv::dnn::readNetFromDarknet(config_path, weights_path);
-}
+  // Load network
+  net_ = readNetFromDarknet(config_path, weights_path);
+  net_.setPreferableBackend(DNN_BACKEND_OPENCV);
+  net_.setPreferableTarget(DNN_TARGET_CPU);
 
-void ObjectDetection::ObjectDetectionCallback(const sensor_msgs::Image &img)
-{
-  // this callback runs every time a msg is received on the camera topic, performs some action and publish bbox on publisher'
-  // auto cv_img_rgb = std::make_shared<cv::Mat>(img.height, img.width, CV_8UC3, (void*)img.data.data());
-  cv_bridge::CvImagePtr cv_ptr;
-  cv_ptr = cv_bridge::toCvCopy(img, sensor_msgs::image_encodings::BGR8);
-  cv::Mat blob;
-  cv::dnn::blobFromImage(cv_ptr->image, blob, 1/255.0, cv::Size(416, 416), cv::Scalar(0,0,0), true, false);
-  net_.setInput(blob);
-  std::vector<cv::Mat> output;
-  // std::vector<std::string> output_names;
-  net_.forward(output, getOutputNames());
-  // output = net_.forward();
-
-  float threshold = 0.5; // For non-maximum suppression
-  vision_msgs::Detection2DArray bbox_array;
-  // std::vector<cv::Rect> bboxs;
-  for (auto o : output)
+  ifstream f(names_path.c_str());
+  string label;
+  while (getline(f, label))
   {
-    ROS_INFO_STREAM("output 1: " << o.data[0]);
-    ROS_INFO_STREAM("output 2: " << o.data[1]);
-    ROS_INFO_STREAM("output 3: " << o.data[2]);
-    ROS_INFO_STREAM("output 4: " << o.data[3]);
-    vision_msgs::Detection2D bbox;
-    float* data = (float*) o.data;
-    int centerX = (int) (data[0] * cv_ptr->image.cols);
-    int centerY = (int) (data[1] * cv_ptr->image.rows);
-    int width = (int) (data[2] * cv_ptr->image.cols);
-    int height = (int) (data[3] * cv_ptr->image.rows);
-    // int top_x = centerX - width / 2;
-    // int top_y = centerY - height / 2;
-    // bboxs.push_back(cv::Rect(top_x, top_y, width, height));
-    bbox.header.stamp = img.header.stamp;
-    bbox.source_img = img;
-    geometry_msgs::Pose2D center;
-    center.x = centerX;
-    center.y = centerY;
-    bbox.bbox.center = center;
-    bbox.bbox.size_x = width;
-    bbox.bbox.size_y = height;
-    bbox_array.header.stamp = img.header.stamp;
-    bbox_array.detections.push_back(bbox);
-
-
-    cv::rectangle(cv_ptr->image, cv::Point(bbox.bbox.center.x - bbox.bbox.size_x / 2, bbox.bbox.center.y - bbox.bbox.size_y / 2), cv::Point(bbox.bbox.center.x + bbox.bbox.size_x / 2, bbox.bbox.center.y + bbox.bbox.size_y / 2), cv::Scalar(255, 178, 50), 3);
-    cv::imwrite("/home/olewam/catkin_ws/src/drone_detections/img_pub/include/1864_bbox.jpg", cv_ptr->image);
-  }
-
-  // std::vector<std::vector<float>> bboxes = GetBBoxes(img); // GetBBoxes is a function that returns a vector of vectors of floats. Not implemented
-  // std::vector<cv::Rect> bbox_nms = nms(bboxes, threshold);
-  // vision_msgs::Detection2DArray bbox_msg = RectToDetection2D(bbox_nms);
-  bbox_pub_.publish(bbox_array);
+    classes_.push_back(label);
+  } 
 }
 
-// vision_msgs::Detection2DArray ObjectDetection::RectToDetection2DArray(const std::vector<cv::Rect> &bbox)
-// {
-//   vision_msgs::Detection2DArray bbox_msg;
-//   for (int i = 0; i < bbox.size(); i++)
-//   {
-//     vision_msgs::Detection2D detection;
-//     vision_msgs::BoundingBox2D bbox_i;
-    
-//     bbox_i.bbox.center.x = bbox[i].x + bbox[i].width / 2;
-//     bbox_i.bbox.center.y = bbox[i].y + bbox[i].height / 2;
-//     bbox_i.bbox.size_x = bbox[i].width;
-//     bbox_i.bbox.size_y = bbox[i].height;
-//     detection.bbox = bbox_i;
-//     bbox_msg.detections.push_back(detection);
-//   }
+void ObjectDetection::ObjectDetectionCallback(const sensor_msgs::ImagePtr &img)
+{
+  // this callback runs every time a msg is received on the camera topic, performs some action and publish bbox on publisher
+  cv_bridge::CvImagePtr cv_ptr;
+  cv_ptr = cv_bridge::toCvCopy(img, sensor_msgs::image_encodings::RGB8);
   
-//   return bbox_msg;
+  Mat blob;
+  ROS_INFO("Making blob\n");
+  blobFromImage(cv_ptr->image, blob, 1/255.0, Size(416, 416), Scalar(0,0,0), true, false);
+  ROS_INFO("Made blob\n");
+  net_.setInput(blob);
 
-// }
+  // Run forward pass through the network to find detections
+  vector<Mat> detections;
+  net_.forward(detections, getOutputNames());
+  ROS_INFO("Forward pass complete\n");
+
+  for (size_t i = 0; i < detections.size(); i++)
+  {
+    float* detection_data = (float*) detections[i].data;
+    for (int j = 0; j < detections[i].rows; j++, detection_data += detections[i].cols)
+    {
+      Mat scores = detections[i].row(j).colRange(5, detections[i].cols);
+      Point classIdPoint;
+      double confidence;
+      minMaxLoc(scores, 0, &confidence, 0, &classIdPoint);
+      if (confidence > confidence_threshold_)
+      {
+        ROS_INFO_STREAM("Detection with confidence: " << confidence << "\n");
+        // int centerX = (int)(detection_data[0] * (cv_ptr->image).cols);
+        // int centerY = (int)(detection_data[1] * (cv_ptr->image).rows);
+        // int width = (int)(detection_data[2] * (cv_ptr->image).cols);
+        // int height = (int)(detection_data[3] * (cv_ptr->image).rows);
+        int centerX = (int)(detection_data[0] * 720);
+        int centerY = (int)(detection_data[1] * 540);
+        int width = (int)(detection_data[2] * 720);
+        int height = (int)(detection_data[3] * 540);
+        int bbox_top_left_x = centerX - width / 2;
+        int bbox_top_left_y = centerY - height / 2;
+
+        classIds_.push_back(classIdPoint.x);
+        confidences_.push_back((float)confidence);
+        boxes_.push_back(Rect(bbox_top_left_x, bbox_top_left_y, width, height));
+      }
+    }
+
+    // Perform non maximum suppression to remove bboxes that overlap
+    vector<int> indices;
+    NMSBoxes(boxes_, confidences_, confidence_threshold_, nms_threshold_, indices);
+    
+    // Send bbox detections here or in the loop
+    vision_msgs::Detection2DArray bbox_array;
+    for (auto i : indices)
+    {
+      Rect box = boxes_[i];
+
+      // vision_msgs::Detection2D bbox;
+      // geometry_msgs::Pose2D center;
+
+      // bbox.header.stamp = (cv_ptr->image).header.stamp;
+      // bbox.source_img = cv_ptr->image;
+      // center.x = centerX;
+      // center.x = box.
+      // center.y = centerY;
+      // bbox.bbox.center = center;
+      // bbox.bbox.size_x = width;
+      // bbox.bbox.size_y = height;
+      // bbox_array.header.stamp = (cv_ptr->image).header.stamp;
+      // bbox_array.detections.push_back(bbox);
+
+      // Draw bounding box for debug purposes
+      drawPred(classIds_[i], confidences_[i], box.x, box.y, box.x + box.width, box.y + box.height, cv_ptr->image);
+
+    }
+    // bbox_pub_.publish(bbox_array);
+  }
+      
+  imwrite("/home/olewam/detection_ws/src/drone_detections/img_pub/include/pub_1864_bbox.jpg", cv_ptr->image);  
+
+}
+
+void ObjectDetection::drawPred(int classId, float conf, int top_left_x, int top_left_y, int width, int height, Mat& frame)
+{
+  /*
+    Based on https://learnopencv.com/deep-learning-based-object-detection-using-yolov3-with-opencv-python-c/
+  */
+
+  //Draw a rectangle displaying the bounding box
+  rectangle(frame, Point(top_left_x, top_left_y), Point(width, height), Scalar(255, 178, 50), 3);
+    
+  //Get the label for the class name and its confidence
+  string label = format("%.2f", conf);
+  if (!classes_.empty())
+  {
+      CV_Assert(classId < (int)classes_.size());
+      label = classes_[classId] + ":" + label;
+  }
+    
+  //Display the label at the top of the bounding box
+  int baseLine;
+  Size labelSize = getTextSize(label, FONT_HERSHEY_SIMPLEX, 0.5, 1, &baseLine);
+  top_left_y = max(top_left_y, labelSize.height);
+  rectangle(frame, Point(top_left_x, top_left_y - round(1.5*labelSize.height)), Point(top_left_x + round(1.5*labelSize.width), top_left_y + baseLine), Scalar(255, 255, 255), FILLED);
+  putText(frame, label, Point(top_left_x, top_left_y), FONT_HERSHEY_SIMPLEX, 0.75, Scalar(0,0,0),1);
+}
 
 std::vector<std::string> ObjectDetection::getOutputNames()
 {

@@ -5,11 +5,14 @@ ObjectDetection::ObjectDetection(ros::NodeHandle &nh)
   : nh_(nh)
 {
   camera_sub_ = nh_.subscribe("/yolo/image", 1, &ObjectDetection::ObjectDetectionCallback, this); // Double check topic
-  bbox_pub_ = nh_.advertise<vision_msgs::Detection2DArray>("/yolo/detections", 1);
+  bbox_pub_ = nh_.advertise<vision_msgs::Detection2DArray>("/yolo/bbox", 1);
 
-  string config_path = "/home/olewam/detection_ws/src/drone_detections/yolo/include/darpa_v3.cfg"; // Path to yolo config file 
-  string weights_path = "/home/olewam/detection_ws/src/drone_detections/yolo/include/darpa_v3_16000.weights"; // Path to yolo weights file 
-  string names_path = "/home/olewam/detection_ws/src/drone_detections/yolo/include/darpa.names";
+  std::string config_path;
+  std::string weights_path;
+  std::string names_path;
+  nh_.getParam("/yolo/config_path", config_path);
+  nh_.getParam("/yolo/weights_path", weights_path);
+  nh_.getParam("/yolo/names_path", names_path);
 
   // Load network
   net_ = readNetFromDarknet(config_path, weights_path);
@@ -31,9 +34,7 @@ void ObjectDetection::ObjectDetectionCallback(const sensor_msgs::ImagePtr &img)
   cv_ptr = cv_bridge::toCvCopy(img, sensor_msgs::image_encodings::RGB8);
   
   Mat blob;
-  ROS_INFO("Making blob\n");
   blobFromImage(cv_ptr->image, blob, 1/255.0, Size(416, 416), Scalar(0,0,0), true, false);
-  ROS_INFO("Made blob\n");
   net_.setInput(blob);
 
   // Run forward pass through the network to find detections
@@ -53,14 +54,14 @@ void ObjectDetection::ObjectDetectionCallback(const sensor_msgs::ImagePtr &img)
       if (confidence > confidence_threshold_)
       {
         ROS_INFO_STREAM("Detection with confidence: " << confidence << "\n");
-        // int centerX = (int)(detection_data[0] * (cv_ptr->image).cols);
-        // int centerY = (int)(detection_data[1] * (cv_ptr->image).rows);
-        // int width = (int)(detection_data[2] * (cv_ptr->image).cols);
-        // int height = (int)(detection_data[3] * (cv_ptr->image).rows);
-        int centerX = (int)(detection_data[0] * 720);
-        int centerY = (int)(detection_data[1] * 540);
-        int width = (int)(detection_data[2] * 720);
-        int height = (int)(detection_data[3] * 540);
+        int centerX = (int)(detection_data[0] * (cv_ptr->image).cols);
+        int centerY = (int)(detection_data[1] * (cv_ptr->image).rows);
+        int width = (int)(detection_data[2] * (cv_ptr->image).cols);
+        int height = (int)(detection_data[3] * (cv_ptr->image).rows);
+        // int centerX = (int)(detection_data[0] * 720);
+        // int centerY = (int)(detection_data[1] * 540);
+        // int width = (int)(detection_data[2] * 720);
+        // int height = (int)(detection_data[3] * 540);
         int bbox_top_left_x = centerX - width / 2;
         int bbox_top_left_y = centerY - height / 2;
 
@@ -80,28 +81,27 @@ void ObjectDetection::ObjectDetectionCallback(const sensor_msgs::ImagePtr &img)
     {
       Rect box = boxes_[i];
 
-      // vision_msgs::Detection2D bbox;
-      // geometry_msgs::Pose2D center;
+      vision_msgs::Detection2D bbox;
+      geometry_msgs::Pose2D center;
 
-      // bbox.header.stamp = (cv_ptr->image).header.stamp;
-      // bbox.source_img = cv_ptr->image;
-      // center.x = centerX;
-      // center.x = box.
-      // center.y = centerY;
-      // bbox.bbox.center = center;
-      // bbox.bbox.size_x = width;
-      // bbox.bbox.size_y = height;
-      // bbox_array.header.stamp = (cv_ptr->image).header.stamp;
-      // bbox_array.detections.push_back(bbox);
+      bbox.header.stamp = img->header.stamp;
+      // bbox.source_img = *img;
+      center.x = box.x + box.width / 2; // Center x is top left x + half of the width
+      center.y = box.y + box.height / 2; // Center y is top left y + half of the height
+      bbox.bbox.center = center;
+      bbox.bbox.size_x = box.width;
+      bbox.bbox.size_y = box.height;
+      bbox_array.header.stamp = img->header.stamp;
+      bbox_array.detections.push_back(bbox);
 
       // Draw bounding box for debug purposes
-      drawPred(classIds_[i], confidences_[i], box.x, box.y, box.x + box.width, box.y + box.height, cv_ptr->image);
+      // drawPred(classIds_[i], confidences_[i], box.x, box.y, box.x + box.width, box.y + box.height, cv_ptr->image);
 
     }
-    // bbox_pub_.publish(bbox_array);
+    bbox_pub_.publish(bbox_array);
   }
       
-  imwrite("/home/olewam/detection_ws/src/drone_detections/img_pub/include/pub_1864_bbox.jpg", cv_ptr->image);  
+  // imwrite("/home/olewam/detection_ws/src/drone_detections/img_pub/include/pub_1864_bbox.jpg", cv_ptr->image);  
 
 }
 

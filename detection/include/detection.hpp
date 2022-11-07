@@ -15,8 +15,11 @@ class Detection
         ros::Publisher bbox_depth_pub_;
 
         sensor_msgs::Image last_image_received_;
-        sensor_msgs::Image last_depth_image_received_;
+        std::vector<sensor_msgs::Image>* last_depth_image_received_;
         sensor_msgs::Image depth_image_sent_;
+
+        ros::Time sync_threshold_
+
         bool image_received_ = false;
         bool depth_image_received_ = false;
         void sync_and_broadcast_image();

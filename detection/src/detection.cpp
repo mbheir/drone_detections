@@ -9,22 +9,34 @@
 Detection::Detection(ros::NodeHandle &nh)
 : nh_(nh)
 {
-    camera_sub_ = nh_.subscribe("/camera/color/image_raw", 1, &Detection::cameraCallback, this); // Double check topic. Maybe unnecessary. 
-    bbox_sub_ = nh_.subscribe("/yolo/detection", 1, &Detection::bboxCallback, this); // Find topic
+    // camera_sub_ = nh_.subscribe("/camera/color/image_raw", 1, &Detection::cameraCallback, this); // Double check topic. Maybe unnecessary. 
+    bbox_sub_ = nh_.subscribe("/yolo/bbox", 1, &Detection::bboxCallback, this); // Find topic
     depth_sub_ = nh_.subscribe("/camera/depth", 1, &Detection::bboxCallback, this); // Check topic
-    image_to_yolo_pub_ = nh.advertise<sensor_msgs::Image>("/yolo/image", 1); // Publish image to yolo
-    bbox_depth_pub_ = nh_.advertise<vision_msgs::Detection2DArray>("/", 1); // Find 
+    // image_to_yolo_pub_ = nh.advertise<sensor_msgs::Image>("/yolo/image", 1); // Publish image to yolo
+    bbox_depth_pub_ = nh_.advertise<vision_msgs::Detection2DArray>("/detection", 1); // Find 
 }
 
 void Detection::cameraCallback(const sensor_msgs::Image &img)
 {
     last_image_received_ = img;
     image_received_ = true;
+    sync_and_broadcast_image()
+
 }
 
 void Detection::depthCallback(const sensor_msgs::Image &depth_img)
 {
-    last_depth_image_received_ = depth_img;
+    last_depth_image_received_->push_back(depth_img);
+    ROS_INFO_STREAM("Depth vec size pre loop: " << last_depth_image_received_->size() << "\n");
+    for (auto di : last_dept_image_received_)
+    {
+        ROS_INFO_STREAM("Time diff: " << di->header.stamp - ros::Time::now() << ", result: " << di->header.stamp - ros::Time::now() < ros::Time(1) << "\n");
+        if (di->header.stamp - ros::Time::now() < ros::Time(1))
+        {
+            last_depth_image_received_->remove(*di);
+        }
+    }
+    ROS_INFO_STREAM("Depth vec size post loop: " << last_depth_image_received_->size() << "\n");
     depth_image_received_ = true;
 }
 
@@ -59,7 +71,7 @@ void Detection::sync_and_broadcast_image()
             // Check timestamps:
             ros::Time time_image = last_image_received_.header.stamp;
             ros::Time time_depth = last_depth_image_received_.header.stamp;
-            if (time_image == time_depth)
+            if ((time_image - time_depth) < sync_threshold_ && time_image.isValid()) // Timestamps within an acceptable thresholds and nonzero time
             {
                 image_to_yolo_pub_.publish(last_image_received_);
                 depth_image_sent_ = last_depth_image_received_;

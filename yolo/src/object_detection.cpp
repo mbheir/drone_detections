@@ -4,7 +4,7 @@
 ObjectDetection::ObjectDetection(ros::NodeHandle &nh)
   : nh_(nh)
 {
-  camera_sub_ = nh_.subscribe("/yolo/image", 1, &ObjectDetection::ObjectDetectionCallback, this); // Double check topic
+  camera_sub_ = nh_.subscribe("/camera/color/image_raw", 1, &ObjectDetection::ObjectDetectionCallback, this); // Double check topic
   bbox_pub_ = nh_.advertise<vision_msgs::Detection2DArray>("/yolo/bbox", 1);
 
   std::string config_path;

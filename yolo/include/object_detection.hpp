@@ -16,6 +16,7 @@ class ObjectDetection
     ros::NodeHandle nh_;
     ros::Subscriber camera_sub_;
     ros::Publisher bbox_pub_;
+    ros::Publisher detection_pub_;
 
     Net net_;
     vector<string> classes_;

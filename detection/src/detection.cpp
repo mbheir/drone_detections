@@ -50,8 +50,8 @@ void Detection::bboxCallback(const vision_msgs::Detection2DArray &bboxes)
     float depth;
     for (int i = 0; i < detections.size(); i++) 
     {
-        depth = calcualte_avg_depth(detections[i]);
-        bboxes_with_depth.detections[i].bbox.center.theta = static_cast<double>(depth);
+        depth = calculate_avg_depth(detections[i], detections[i].header.stamp);
+        bboxes_with_depth.detections[i].bbox.center.theta = static_cast<double>(depth); // store depth in theta
     }
      
     bbox_depth_pub_.publish(bboxes_with_depth);
@@ -81,8 +81,20 @@ void Detection::sync_and_broadcast_image()
     }
 }
 
-float Detection::calcualte_avg_depth(vision_msgs::Detection2D &bbox)
+float Detection::calculate_avg_depth(vision_msgs::Detection2D &bbox, const ros::Time stamp)
 {
+    // Find cosest depth data by time
+    sensor_msgs::Image depth_image;
+    depth_image.header.stamp = ros::Time(100000000);
+    for (auto di : last_dept_image_received_)
+    {
+        if (std::abs(di->header.stamp - stamp) < std::abs(depth_image.header.stamp - stamp))
+        {
+            depth_image = *di;
+        }
+    }
+    ROS_INFO_STREAM("Stamp: " << stamp << " and depth stamp: " << depth_image.header.stamp << "\n");
+
     // Find average depth in bbox
     // Update bbox type to include depth
     geometry_msgs::Pose2D center = bbox.bbox.center;
@@ -97,7 +109,7 @@ float Detection::calcualte_avg_depth(vision_msgs::Detection2D &bbox)
     {
         for (int k = 0; k < size_y; k++)
         {
-            cum_depth += depth_image_sent_.data[(y0+k)*(x0+j)];
+            cum_depth += depth_image.data[(y0+k)*(x0+j)];
         }
     }
     float avg_depth = cum_depth/(size_x*size_y);

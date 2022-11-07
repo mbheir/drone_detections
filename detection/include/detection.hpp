@@ -23,7 +23,7 @@ class Detection
         bool image_received_ = false;
         bool depth_image_received_ = false;
         void sync_and_broadcast_image();
-        float calcualte_avg_depth(vision_msgs::Detection2D &bbox);
+        float calculate_avg_depth(vision_msgs::Detection2D &bbox, const ros::Time stamp);
     
     public:
         Detection(ros::NodeHandle &nh);

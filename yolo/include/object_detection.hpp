@@ -20,9 +20,9 @@ class ObjectDetection
 
     Net net_;
     vector<string> classes_;
-    vector<int> classIds_;
-    vector<float> confidences_;
-    vector<Rect> boxes_;
+    // vector<int> classIds_;
+    // vector<float> confidences_;
+    // vector<Rect> boxes_;
     float confidence_threshold_ = 0.5;
     float nms_threshold_ = 0.4;
     // std::unique_ptr<Detector> detector_;

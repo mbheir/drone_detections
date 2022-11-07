@@ -31,6 +31,10 @@ ObjectDetection::ObjectDetection(ros::NodeHandle &nh)
 
 void ObjectDetection::ObjectDetectionCallback(const sensor_msgs::ImagePtr &img)
 {
+  vector<int> classIds;
+  vector<float> confidences;
+  vector<Rect> boxes;
+
   // this callback runs every time a msg is received on the camera topic, performs some action and publish bbox on publisher
   cv_bridge::CvImagePtr cv_ptr;
   cv_ptr = cv_bridge::toCvCopy(img, sensor_msgs::image_encodings::RGB8);
@@ -67,21 +71,21 @@ void ObjectDetection::ObjectDetectionCallback(const sensor_msgs::ImagePtr &img)
         int bbox_top_left_x = centerX - width / 2;
         int bbox_top_left_y = centerY - height / 2;
 
-        classIds_.push_back(classIdPoint.x);
-        confidences_.push_back((float)confidence);
-        boxes_.push_back(Rect(bbox_top_left_x, bbox_top_left_y, width, height));
+        classIds.push_back(classIdPoint.x);
+        confidences.push_back((float)confidence);
+        boxes.push_back(Rect(bbox_top_left_x, bbox_top_left_y, width, height));
       }
     }
 
     // Perform non maximum suppression to remove bboxes that overlap
     vector<int> indices;
-    NMSBoxes(boxes_, confidences_, confidence_threshold_, nms_threshold_, indices);
+    NMSBoxes(boxes, confidences, confidence_threshold_, nms_threshold_, indices);
     
     // Send bbox detections here or in the loop
     vision_msgs::Detection2DArray bbox_array;
     for (auto i : indices)
     {
-      Rect box = boxes_[i];
+      Rect box = boxes[i];
 
       vision_msgs::Detection2D bbox;
       geometry_msgs::Pose2D center;
@@ -97,14 +101,14 @@ void ObjectDetection::ObjectDetectionCallback(const sensor_msgs::ImagePtr &img)
       bbox_array.detections.push_back(bbox);
 
       // Draw bounding box for debug purposes
-      drawPred(classIds_[i], confidences_[i], box.x, box.y, box.x + box.width, box.y + box.height, cv_ptr->image);
+      drawPred(classIds[i], confidences[i], box.x, box.y, box.x + box.width, box.y + box.height, cv_ptr->image);
 
     }
     bbox_pub_.publish(bbox_array);
-    sensor_msgs::ImagePtr detection_frame = cv_bridge::CvImage(std_msgs::Header(), "rgb8", cv_ptr->image).toImageMsg();
-    detection_pub_.publish(detection_frame);
   }
       
+  sensor_msgs::ImagePtr detection_frame = cv_bridge::CvImage(std_msgs::Header(), "rgb8", cv_ptr->image).toImageMsg();
+  detection_pub_.publish(detection_frame);
   // imwrite("/home/olewam/detection_ws/src/drone_detections/img_pub/include/pub_1864_bbox.jpg", cv_ptr->image);  
 
 }

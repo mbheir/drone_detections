@@ -9,6 +9,7 @@ project(detection)
 ## is used, also find other catkin packages
 find_package(sensor_msgs REQUIRED)
 find_package(vision_msgs REQUIRED)
+find_package( OpenCV REQUIRED )
 
 find_package(catkin REQUIRED COMPONENTS
   roscpp
@@ -122,6 +123,7 @@ catkin_package(
 include_directories(
 include
   ${catkin_INCLUDE_DIRS}
+  ${OpenCV_INCLUDE_DIRS}
 )
 
 ## Declare a C++ library
@@ -138,8 +140,8 @@ include
 ## With catkin_make all packages are built within a single CMake context
 ## The recommended prefix ensures that target names across packages don't collide
 add_executable(${PROJECT_NAME} 
-  src/object_detection_node.cpp
-  src/object_detection.cpp
+  src/detection_node.cpp
+  src/detection.cpp
 )
 
 ## Rename C++ executable without prefix
@@ -155,6 +157,7 @@ add_executable(${PROJECT_NAME}
 ## Specify libraries to link a library or executable target against
 target_link_libraries(${PROJECT_NAME}
   ${catkin_LIBRARIES}
+  ${OpenCV_LIBS}
 )
 
 #############

@@ -16,27 +16,27 @@ Detection::Detection(ros::NodeHandle &nh)
     bbox_depth_pub_ = nh_.advertise<vision_msgs::Detection2DArray>("/detection", 1); // Find 
 }
 
-void Detection::cameraCallback(const sensor_msgs::Image &img)
-{
-    last_image_received_ = img;
-    image_received_ = true;
-    sync_and_broadcast_image()
+// void Detection::cameraCallback(const sensor_msgs::Image &img)
+// {
+//     last_image_received_ = img;
+//     image_received_ = true;
+//     sync_and_broadcast_image();
 
-}
+// }
 
 void Detection::depthCallback(const sensor_msgs::Image &depth_img)
 {
-    last_depth_image_received_->push_back(depth_img);
-    ROS_INFO_STREAM("Depth vec size pre loop: " << last_depth_image_received_->size() << "\n");
-    for (auto di : last_dept_image_received_)
+    last_depth_image_received_.push_back(depth_img);
+    ROS_INFO_STREAM("Depth vec size pre loop: " << last_depth_image_received_.size() << "\n");
+    for (int i = 0; i < last_depth_image_received_.size(); i++)
     {
-        ROS_INFO_STREAM("Time diff: " << di->header.stamp - ros::Time::now() << ", result: " << di->header.stamp - ros::Time::now() < ros::Time(1) << "\n");
-        if (di->header.stamp - ros::Time::now() < ros::Time(1))
+        ROS_INFO_STREAM("Time diff: " << last_depth_image_received_[i].header.stamp - ros::Time::now() << ", result: " << ((last_depth_image_received_[i].header.stamp - ros::Time::now()) < ros::Duration(1)) << "\n");
+        if (last_depth_image_received_[i].header.stamp - ros::Time::now() < ros::Duration(1))
         {
-            last_depth_image_received_->remove(*di);
+            last_depth_image_received_.erase(last_depth_image_received_.begin() + i);
         }
     }
-    ROS_INFO_STREAM("Depth vec size post loop: " << last_depth_image_received_->size() << "\n");
+    ROS_INFO_STREAM("Depth vec size post loop: " << last_depth_image_received_.size() << "\n");
     depth_image_received_ = true;
 }
 
@@ -57,40 +57,40 @@ void Detection::bboxCallback(const vision_msgs::Detection2DArray &bboxes)
     bbox_depth_pub_.publish(bboxes_with_depth);
 }
 
-void Detection::sync_and_broadcast_image()
-{
-    ros::Rate r(50);
-    while (ros::ok())
-    {
-        ros::spinOnce();
-        if (image_received_ && depth_image_received_) 
-        {
-            image_received_ = false;
-            depth_image_received_ = false;
+// void Detection::sync_and_broadcast_image()
+// {
+//     ros::Rate r(50);
+//     while (ros::ok())
+//     {
+//         ros::spinOnce();
+//         if (image_received_ && depth_image_received_) 
+//         {
+//             image_received_ = false;
+//             depth_image_received_ = false;
 
-            // Check timestamps:
-            ros::Time time_image = last_image_received_.header.stamp;
-            ros::Time time_depth = last_depth_image_received_.header.stamp;
-            if ((time_image - time_depth) < sync_threshold_ && time_image.isValid()) // Timestamps within an acceptable thresholds and nonzero time
-            {
-                image_to_yolo_pub_.publish(last_image_received_);
-                depth_image_sent_ = last_depth_image_received_;
-            }
-        } 
-        r.sleep();
-    }
-}
+//             // Check timestamps:
+//             ros::Time time_image = last_image_received_.header.stamp;
+//             ros::Time time_depth = last_depth_image_received_.header.stamp;
+//             if ((time_image - time_depth) < sync_threshold_ && time_image.isValid()) // Timestamps within an acceptable thresholds and nonzero time
+//             {
+//                 image_to_yolo_pub_.publish(last_image_received_);
+//                 depth_image_sent_ = last_depth_image_received_;
+//             }
+//         } 
+//         r.sleep();
+//     }
+// }
 
 float Detection::calculate_avg_depth(vision_msgs::Detection2D &bbox, const ros::Time stamp)
 {
     // Find cosest depth data by time
     sensor_msgs::Image depth_image;
     depth_image.header.stamp = ros::Time(100000000);
-    for (auto di : last_dept_image_received_)
+    for (auto di : last_depth_image_received_)
     {
-        if (std::abs(di->header.stamp - stamp) < std::abs(depth_image.header.stamp - stamp))
+        if (di.header.stamp - stamp < depth_image.header.stamp - stamp)
         {
-            depth_image = *di;
+            depth_image = di;
         }
     }
     ROS_INFO_STREAM("Stamp: " << stamp << " and depth stamp: " << depth_image.header.stamp << "\n");

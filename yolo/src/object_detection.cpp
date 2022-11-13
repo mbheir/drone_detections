@@ -6,6 +6,8 @@ ObjectDetection::ObjectDetection(ros::NodeHandle &nh)
 {
   camera_sub_ = nh_.subscribe("/camera/color/image_raw", 1, &ObjectDetection::ObjectDetectionCallback, this); // Double check topic
   bbox_pub_ = nh_.advertise<vision_msgs::Detection2DArray>("/yolo/bbox", 1);
+  detection_pub_ = nh_.advertise<sensor_msgs::Image>("/yolo/detection", 1);
+
 
   std::string config_path;
   std::string weights_path;
@@ -95,10 +97,12 @@ void ObjectDetection::ObjectDetectionCallback(const sensor_msgs::ImagePtr &img)
       bbox_array.detections.push_back(bbox);
 
       // Draw bounding box for debug purposes
-      // drawPred(classIds_[i], confidences_[i], box.x, box.y, box.x + box.width, box.y + box.height, cv_ptr->image);
+      drawPred(classIds_[i], confidences_[i], box.x, box.y, box.x + box.width, box.y + box.height, cv_ptr->image);
 
     }
     bbox_pub_.publish(bbox_array);
+    sensor_msgs::ImagePtr detection_frame = cv_bridge::CvImage(std_msgs::Header(), "rgb8", cv_ptr->image).toImageMsg();
+    detection_pub_.publish(detection_frame);
   }
       
   // imwrite("/home/olewam/detection_ws/src/drone_detections/img_pub/include/pub_1864_bbox.jpg", cv_ptr->image);  

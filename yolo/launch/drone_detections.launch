@@ -1,9 +1,9 @@
 <launch>
 
     <node pkg="yolo" name="yolo" type="yolo" output="screen">
-        <param name="config_path" type="string" value="/home/olewam/detection_ws/src/drone_detections/yolo/include/darpa_v3.cfg" />
-        <param name="weights_path" type="string" value="/home/olewam/detection_ws/src/drone_detections/yolo/include/darpa_v3_16000.weights" />
-        <param name="names_path" type="string" value="/home/olewam/detection_ws/src/drone_detections/yolo/include/darpa.names" />
+        <param name="config_path" type="string" value="/home/martinheir/catkin_ws/src/drone_detections/yolo/include/darpa_v3.cfg" />
+        <param name="weights_path" type="string" value="/home/martinheir/catkin_ws/src/drone_detections/yolo/include/darpa_v3_16000.weights" />
+        <param name="names_path" type="string" value="/home/martinheir/catkin_ws/src/drone_detections/yolo/include/darpa.names" />
     </node>
 
 </launch>
